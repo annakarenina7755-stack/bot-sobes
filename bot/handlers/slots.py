@@ -59,7 +59,7 @@ def _slots_keyboard(slots: list[Slot]) -> InlineKeyboardMarkup:
 @router.message(Command("slots"))
 @_admin_only
 async def cmd_slots(message: Message):
-    days = _workdays(5)
+    days = _workdays(3)
     await _ensure_slots(days)
 
     async with SessionLocal() as session:

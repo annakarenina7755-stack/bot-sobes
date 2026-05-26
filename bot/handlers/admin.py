@@ -96,7 +96,7 @@ async def admin_invite(callback: CallbackQuery):
         await session.commit()
         tg_id = candidate.tg_id
 
-    days = _workdays(5)
+    days = _workdays(3)
     await _ensure_slots(days)
 
     await callback.message.edit_reply_markup(reply_markup=None)
@@ -181,7 +181,7 @@ async def slot_day(callback: CallbackQuery):
 @router.callback_query(F.data.startswith("slot_back:"))
 async def slot_back(callback: CallbackQuery):
     candidate_id = int(callback.data.split(":")[1])
-    days = _workdays(5)
+    days = _workdays(3)
     await callback.message.edit_text(
         "Выберите удобный день:",
         reply_markup=_day_keyboard(days, candidate_id),
