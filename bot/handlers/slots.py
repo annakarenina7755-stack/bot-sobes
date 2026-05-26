@@ -82,7 +82,54 @@ async def cmd_slots(message: Message):
         day_slots = list(group)
         from bot.handlers.admin import WEEKDAYS_RU
         header = f"📅 {WEEKDAYS_RU[day.weekday()]}, {day.day} {MONTHS_RU[day.month - 1]}"
-        await message.answer(header, reply_markup=_slots_keyboard(day_slots))
+        day_iso = day.isoformat()
+        all_blocked = all(s.is_blocked for s in day_slots)
+        day_btn = InlineKeyboardButton(
+            text="🔓 Разблокировать день" if all_blocked else "🔒 Заблокировать день",
+            callback_data=f"day_unblock:{day_iso}" if all_blocked else f"day_block:{day_iso}",
+        )
+        kb = _slots_keyboard(day_slots)
+        kb.inline_keyboard.insert(0, [day_btn])
+        await message.answer(header, reply_markup=kb)
+
+
+@router.callback_query(F.data.startswith("day_block:"))
+async def day_block(callback: CallbackQuery):
+    from datetime import date
+    day = date.fromisoformat(callback.data.split(":")[1])
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Slot).where(
+                Slot.dt >= datetime(day.year, day.month, day.day, 0, 0),
+                Slot.dt < datetime(day.year, day.month, day.day, 23, 59),
+                Slot.candidate_id.is_(None),
+            )
+        )
+        slots = result.scalars().all()
+        for slot in slots:
+            slot.is_blocked = True
+        await session.commit()
+    await callback.answer(f"День заблокирован ({len(slots)} слотов).")
+    await callback.message.delete()
+
+
+@router.callback_query(F.data.startswith("day_unblock:"))
+async def day_unblock(callback: CallbackQuery):
+    from datetime import date
+    day = date.fromisoformat(callback.data.split(":")[1])
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Slot).where(
+                Slot.dt >= datetime(day.year, day.month, day.day, 0, 0),
+                Slot.dt < datetime(day.year, day.month, day.day, 23, 59),
+            )
+        )
+        slots = result.scalars().all()
+        for slot in slots:
+            slot.is_blocked = False
+        await session.commit()
+    await callback.answer(f"День разблокирован ({len(slots)} слотов).")
+    await callback.message.delete()
 
 
 @router.callback_query(F.data.startswith("slot_block:"))
