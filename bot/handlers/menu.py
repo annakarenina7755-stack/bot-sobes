@@ -1,17 +1,23 @@
 from aiogram import Router, F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
     Message, CallbackQuery,
     InlineKeyboardMarkup, InlineKeyboardButton,
     ReplyKeyboardMarkup, KeyboardButton,
 )
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from bot.config import settings
 from bot.db.database import SessionLocal
 from bot.db.models import Candidate, Questionnaire, CandidateStatus
 
 router = Router()
+
+
+class AdminState(StatesGroup):
+    waiting_contact_id = State()
 
 ADMIN_KB = ReplyKeyboardMarkup(
     keyboard=[
@@ -126,15 +132,18 @@ async def menu_today(message: Message):
 
 # --- Связаться ---
 @router.message(F.text == "👤 Связаться")
-async def menu_contact(message: Message):
+async def menu_contact(message: Message, state: FSMContext):
     if not _is_admin(message.from_user.id):
         return
     await message.answer("Введите ID кандидата (число из карточки):")
+    await state.set_state(AdminState.waiting_contact_id)
 
 
-@router.message(F.text.regexp(r"^\d+$"))
-async def contact_by_id(message: Message):
-    if not _is_admin(message.from_user.id):
+@router.message(AdminState.waiting_contact_id)
+async def contact_by_id(message: Message, state: FSMContext):
+    await state.clear()
+    if not message.text or not message.text.isdigit():
+        await message.answer("Введите корректный числовой ID.")
         return
     candidate_id = int(message.text)
     async with SessionLocal() as session:
