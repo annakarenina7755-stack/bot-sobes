@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def main():
-    from bot.handlers import candidate, admin
+    from bot.handlers import candidate, admin, slots
     from bot.scheduler import start_scheduler
 
     async with engine.begin() as conn:
@@ -24,6 +24,7 @@ async def main():
 
     dp.include_router(candidate.router)
     dp.include_router(admin.router)
+    dp.include_router(slots.router)
 
     start_scheduler(bot)
 
