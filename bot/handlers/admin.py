@@ -212,3 +212,43 @@ async def slot_pick(callback: CallbackQuery):
         settings.ADMIN_CHAT_ID,
         f"📅 Кандидат #{candidate_id} записался на собеседование: <b>{dt_str}</b>",
     )
+
+
+# --- Ответ на напоминание: Да ---
+@router.callback_query(F.data.startswith("remind_yes:"))
+async def remind_yes(callback: CallbackQuery):
+    slot_id = int(callback.data.split(":")[1])
+    async with SessionLocal() as session:
+        slot = await session.get(Slot, slot_id)
+        if slot:
+            slot.confirmed = True
+            await session.commit()
+    await callback.message.edit_text("✅ Отлично! Ждём вас на собеседовании.")
+
+
+# --- Ответ на напоминание: Нет ---
+@router.callback_query(F.data.startswith("remind_no:"))
+async def remind_no(callback: CallbackQuery):
+    slot_id = int(callback.data.split(":")[1])
+    async with SessionLocal() as session:
+        slot = await session.get(Slot, slot_id)
+        if not slot:
+            await callback.answer()
+            return
+        candidate_id = slot.candidate_id
+        slot.candidate_id = None
+        slot.confirmed = None
+        slot.reminder_sent = False
+        candidate = await session.get(Candidate, candidate_id)
+        if candidate:
+            from bot.db.models import CandidateStatus
+            candidate.status = CandidateStatus.new
+        await session.commit()
+
+    await callback.message.edit_text(
+        "Понятно, слот освобождён. Если захотите перезаписаться — обратитесь к нам."
+    )
+    await callback.bot.send_message(
+        settings.ADMIN_CHAT_ID,
+        f"⚠️ Кандидат #{candidate_id} отказался от собеседования. Слот освобождён.",
+    )
