@@ -43,12 +43,20 @@ async def _ensure_slots(days: list) -> None:
         await session.commit()
 
 
+WEEKDAYS_RU = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"]
+MONTHS_RU = ["января", "февраля", "марта", "апреля", "мая", "июня",
+             "июля", "августа", "сентября", "октября", "ноября", "декабря"]
+
+
+def _day_label(d) -> str:
+    return f"{WEEKDAYS_RU[d.weekday()]}, {d.day} {MONTHS_RU[d.month - 1]}"
+
+
 def _day_keyboard(days: list, candidate_id: int) -> InlineKeyboardMarkup:
     rows = []
     for d in days:
-        label = d.strftime("%A, %d %B").capitalize()
         rows.append([InlineKeyboardButton(
-            text=label,
+            text=_day_label(d),
             callback_data=f"slot_day:{candidate_id}:{d.isoformat()}"
         )])
     return InlineKeyboardMarkup(inline_keyboard=rows)
@@ -164,7 +172,7 @@ async def slot_day(callback: CallbackQuery):
         return
 
     await callback.message.edit_text(
-        f"Выберите удобное время на {day.strftime('%d.%m')}:",
+        f"Выберите удобное время на {day.day} {MONTHS_RU[day.month - 1]}:",
         reply_markup=_time_keyboard(slots, candidate_id, day_iso),
     )
 
@@ -196,7 +204,8 @@ async def slot_pick(callback: CallbackQuery):
         slot.candidate_id = candidate_id
         candidate.status = CandidateStatus.scheduled
         await session.commit()
-        dt_str = slot.dt.strftime("%d.%m.%Y в %H:%M")
+        dt = slot.dt
+        dt_str = f"{dt.day} {MONTHS_RU[dt.month - 1]} в {dt.strftime('%H:%M')}"
         tg_id = candidate.tg_id
     await callback.message.edit_text(f"✅ Вы записаны на собеседование {dt_str}.")
     await callback.bot.send_message(
