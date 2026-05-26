@@ -10,7 +10,7 @@ from bot.keyboards import (
     CONSENT_KB, PHONE_KB, SALES_EXP_KB, SCHEDULE_KB
 )
 from bot.states import ConsentState, QuestionnaireState
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 router = Router()
 
@@ -247,9 +247,9 @@ async def _save_questionnaire(message: Message, data: dict):
         candidate = result.scalar_one()
 
         # удаляем старую анкету если есть
-        if candidate.questionnaire:
-            await session.delete(candidate.questionnaire)
-            await session.flush()
+        await session.execute(
+            delete(Questionnaire).where(Questionnaire.candidate_id == candidate.id)
+        )
 
         q = Questionnaire(
             candidate_id=candidate.id,
