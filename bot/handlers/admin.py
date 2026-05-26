@@ -25,8 +25,8 @@ def _workdays(n: int) -> list[datetime]:
 
 def _slots_for_day(day) -> list[datetime]:
     slots = []
-    t = datetime(day.year, day.month, day.day, 12, 0, tzinfo=MSK)
-    end = datetime(day.year, day.month, day.day, 18, 1, tzinfo=MSK)
+    t = datetime(day.year, day.month, day.day, 12, 0)  # naive MSK
+    end = datetime(day.year, day.month, day.day, 18, 1)
     while t < end:
         slots.append(t)
         t += timedelta(minutes=30)
@@ -59,7 +59,7 @@ def _time_keyboard(slots: list[Slot], candidate_id: int, day_iso: str) -> Inline
     rows = []
     for slot in slots:
         row.append(InlineKeyboardButton(
-            text=slot.dt.astimezone(MSK).strftime("%H:%M"),
+            text=slot.dt.strftime("%H:%M"),
             callback_data=f"slot_pick:{candidate_id}:{slot.id}"
         ))
         if len(row) == 4:
@@ -151,8 +151,8 @@ async def slot_day(callback: CallbackQuery):
     async with SessionLocal() as session:
         result = await session.execute(
             select(Slot).where(
-                Slot.dt >= datetime(day.year, day.month, day.day, 0, 0, tzinfo=MSK),
-                Slot.dt < datetime(day.year, day.month, day.day, 23, 59, tzinfo=MSK),
+                Slot.dt >= datetime(day.year, day.month, day.day, 0, 0),
+                Slot.dt < datetime(day.year, day.month, day.day, 23, 59),
                 Slot.candidate_id.is_(None),
                 Slot.is_blocked.is_(False),
             ).order_by(Slot.dt)
@@ -196,10 +196,8 @@ async def slot_pick(callback: CallbackQuery):
         slot.candidate_id = candidate_id
         candidate.status = CandidateStatus.scheduled
         await session.commit()
-        dt_msk = slot.dt.astimezone(MSK)
+        dt_str = slot.dt.strftime("%d.%m.%Y в %H:%M")
         tg_id = candidate.tg_id
-
-    dt_str = dt_msk.strftime("%d.%m.%Y в %H:%M")
     await callback.message.edit_text(f"✅ Вы записаны на собеседование {dt_str}.")
     await callback.bot.send_message(
         settings.ADMIN_CHAT_ID,
