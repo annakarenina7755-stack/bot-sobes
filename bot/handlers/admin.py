@@ -207,7 +207,14 @@ async def slot_pick(callback: CallbackQuery):
         dt = slot.dt
         dt_str = f"{dt.day} {MONTHS_RU[dt.month - 1]} в {dt.strftime('%H:%M')}"
         tg_id = candidate.tg_id
-    await callback.message.edit_text(f"✅ Вы записаны на собеседование {dt_str}.")
+    await callback.message.edit_text(
+        f"✅ Вы записаны на собеседование <b>{dt_str}</b>.\n\n"
+        f"📍 <b>Адрес:</b> Мичуринский проспект, Олимпийская деревня 4к3\n\n"
+        f"Для ориентира вбейте в навигаторе Ресторан «Берикони». "
+        f"Если смотреть на вход ресторана, слева в десяти метрах будет дверь на ступеньках. "
+        f"Позвоните, когда будете возле неё, я вас встречу.\n\n"
+        f"📞 +7 905 530-11-91 Анна"
+    )
     await callback.bot.send_message(
         settings.ADMIN_CHAT_ID,
         f"📅 Кандидат #{candidate_id} записался на собеседование: <b>{dt_str}</b>",
