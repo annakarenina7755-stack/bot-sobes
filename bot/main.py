@@ -31,6 +31,7 @@ async def main():
     await bot.set_my_commands([
         BotCommand(command="start", description="Начать анкету"),
         BotCommand(command="menu", description="Меню администратора"),
+        BotCommand(command="bookings", description="Записи по дням"),
     ])
 
     start_scheduler(bot)
