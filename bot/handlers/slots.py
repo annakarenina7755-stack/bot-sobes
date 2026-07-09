@@ -56,6 +56,34 @@ def _slots_keyboard(slots: list[Slot]) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+def _day_keyboard(day, slots: list[Slot]) -> InlineKeyboardMarkup:
+    all_blocked = all(slot.is_blocked for slot in slots)
+    day_iso = day.isoformat()
+    day_btn = InlineKeyboardButton(
+        text="🔓 Разблокировать день" if all_blocked else "🔒 Заблокировать день",
+        callback_data=f"day_unblock:{day_iso}" if all_blocked else f"day_block:{day_iso}",
+    )
+    kb = _slots_keyboard(slots)
+    kb.inline_keyboard.insert(0, [day_btn])
+    return kb
+
+
+async def _slots_for_calendar_day(day) -> list[Slot]:
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Slot).where(
+                Slot.dt >= datetime(day.year, day.month, day.day, 0, 0),
+                Slot.dt < datetime(day.year, day.month, day.day, 0, 0) + timedelta(days=1),
+            ).order_by(Slot.dt)
+        )
+        return result.scalars().all()
+
+
+async def _refresh_day_message(callback: CallbackQuery, day) -> None:
+    slots = await _slots_for_calendar_day(day)
+    await callback.message.edit_reply_markup(reply_markup=_day_keyboard(day, slots))
+
+
 @router.message(Command("slots"))
 @_admin_only
 async def cmd_slots(message: Message):
@@ -82,15 +110,7 @@ async def cmd_slots(message: Message):
         day_slots = list(group)
         from bot.handlers.admin import WEEKDAYS_RU
         header = f"📅 {WEEKDAYS_RU[day.weekday()]}, {day.day} {MONTHS_RU[day.month - 1]}"
-        day_iso = day.isoformat()
-        all_blocked = all(s.is_blocked for s in day_slots)
-        day_btn = InlineKeyboardButton(
-            text="🔓 Разблокировать день" if all_blocked else "🔒 Заблокировать день",
-            callback_data=f"day_unblock:{day_iso}" if all_blocked else f"day_block:{day_iso}",
-        )
-        kb = _slots_keyboard(day_slots)
-        kb.inline_keyboard.insert(0, [day_btn])
-        await message.answer(header, reply_markup=kb)
+        await message.answer(header, reply_markup=_day_keyboard(day, day_slots))
 
 
 @router.callback_query(F.data.startswith("day_block:"))
@@ -110,7 +130,7 @@ async def day_block(callback: CallbackQuery):
             slot.is_blocked = True
         await session.commit()
     await callback.answer(f"День заблокирован ({len(slots)} слотов).")
-    await callback.message.delete()
+    await _refresh_day_message(callback, day)
 
 
 @router.callback_query(F.data.startswith("day_unblock:"))
@@ -129,7 +149,7 @@ async def day_unblock(callback: CallbackQuery):
             slot.is_blocked = False
         await session.commit()
     await callback.answer(f"День разблокирован ({len(slots)} слотов).")
-    await callback.message.delete()
+    await _refresh_day_message(callback, day)
 
 
 @router.callback_query(F.data.startswith("slot_block:"))
@@ -139,9 +159,13 @@ async def slot_block(callback: CallbackQuery):
         slot = await session.get(Slot, slot_id)
         if slot:
             slot.is_blocked = True
+            day = slot.dt.date()
             await session.commit()
+        else:
+            day = None
     await callback.answer("Слот заблокирован.")
-    await callback.message.delete()
+    if day:
+        await _refresh_day_message(callback, day)
 
 
 @router.callback_query(F.data.startswith("slot_unblock:"))
@@ -151,9 +175,13 @@ async def slot_unblock(callback: CallbackQuery):
         slot = await session.get(Slot, slot_id)
         if slot:
             slot.is_blocked = False
+            day = slot.dt.date()
             await session.commit()
+        else:
+            day = None
     await callback.answer("Слот разблокирован.")
-    await callback.message.delete()
+    if day:
+        await _refresh_day_message(callback, day)
 
 
 @router.callback_query(F.data.startswith("slot_free:"))
@@ -164,6 +192,7 @@ async def slot_free(callback: CallbackQuery):
         if not slot:
             await callback.answer()
             return
+        day = slot.dt.date()
         candidate_id = slot.candidate_id
         slot.candidate_id = None
         slot.reminder_sent = False
@@ -182,7 +211,7 @@ async def slot_free(callback: CallbackQuery):
                     pass
         await session.commit()
     await callback.answer("Слот освобождён.")
-    await callback.message.delete()
+    await _refresh_day_message(callback, day)
 
 
 @router.callback_query(F.data == "noop")
