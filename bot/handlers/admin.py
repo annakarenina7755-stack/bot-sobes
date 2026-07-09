@@ -11,6 +11,9 @@ from bot.db.models import Candidate, CandidateStatus, Slot
 router = Router()
 
 MSK = ZoneInfo("Europe/Moscow")
+SLOT_START_HOUR = 11
+SLOT_END_HOUR = 19
+SLOT_STEP_MINUTES = 20
 
 
 def _workdays(n: int) -> list[datetime]:
@@ -25,21 +28,35 @@ def _workdays(n: int) -> list[datetime]:
 
 def _slots_for_day(day) -> list[datetime]:
     slots = []
-    t = datetime(day.year, day.month, day.day, 12, 0)  # naive MSK
-    end = datetime(day.year, day.month, day.day, 18, 1)
-    while t < end:
+    t = datetime(day.year, day.month, day.day, SLOT_START_HOUR, 0)  # naive MSK
+    end = datetime(day.year, day.month, day.day, SLOT_END_HOUR, 0)
+    while t <= end:
         slots.append(t)
-        t += timedelta(minutes=30)
+        t += timedelta(minutes=SLOT_STEP_MINUTES)
     return slots
 
 
 async def _ensure_slots(days: list) -> None:
     async with SessionLocal() as session:
         for day in days:
-            for dt in _slots_for_day(day):
+            desired_slots = set(_slots_for_day(day))
+            for dt in desired_slots:
                 exists = await session.execute(select(Slot).where(Slot.dt == dt))
                 if not exists.scalar_one_or_none():
                     session.add(Slot(dt=dt))
+
+            start = datetime(day.year, day.month, day.day, 0, 0)
+            end = start + timedelta(days=1)
+            existing = await session.execute(
+                select(Slot).where(
+                    Slot.dt >= start,
+                    Slot.dt < end,
+                    Slot.candidate_id.is_(None),
+                )
+            )
+            for slot in existing.scalars().all():
+                if slot.dt not in desired_slots:
+                    await session.delete(slot)
         await session.commit()
 
 
