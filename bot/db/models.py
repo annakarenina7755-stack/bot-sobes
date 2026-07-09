@@ -69,6 +69,7 @@ class Slot(Base):
     candidate_id: Mapped[int | None] = mapped_column(
         ForeignKey("candidates.id"), nullable=True
     )
+    day_before_reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     confirmed: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 

@@ -6,6 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import BotCommand
+from sqlalchemy import text
 
 from bot.config import settings
 from bot.db.database import engine, Base
@@ -13,12 +14,19 @@ from bot.db.database import engine, Base
 logging.basicConfig(level=logging.INFO)
 
 
+async def ensure_schema():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(
+            text("ALTER TABLE slots ADD COLUMN IF NOT EXISTS day_before_reminder_sent BOOLEAN DEFAULT false")
+        )
+
+
 async def main():
     from bot.handlers import candidate, admin, slots, menu
     from bot.scheduler import start_scheduler
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    await ensure_schema()
 
     bot = Bot(token=settings.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())

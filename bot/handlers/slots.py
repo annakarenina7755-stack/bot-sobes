@@ -196,6 +196,7 @@ async def slot_free(callback: CallbackQuery):
         candidate_id = slot.candidate_id
         slot.candidate_id = None
         slot.reminder_sent = False
+        slot.day_before_reminder_sent = False
         slot.confirmed = None
         if candidate_id:
             candidate = await session.get(Candidate, candidate_id)

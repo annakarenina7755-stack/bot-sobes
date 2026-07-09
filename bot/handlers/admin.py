@@ -266,6 +266,7 @@ async def remind_no(callback: CallbackQuery):
         slot.candidate_id = None
         slot.confirmed = None
         slot.reminder_sent = False
+        slot.day_before_reminder_sent = False
         candidate = await session.get(Candidate, candidate_id)
         if candidate:
             from bot.db.models import CandidateStatus
