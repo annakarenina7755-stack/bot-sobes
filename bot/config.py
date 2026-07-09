@@ -14,6 +14,14 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
 
     TZ: str = "Europe/Moscow"
+    ASK_METRO: bool = True
+    INTERVIEW_ADDRESS: str = "Мичуринский проспект, Олимпийская деревня 4к3"
+    INTERVIEW_DIRECTIONS: str = (
+        "Для ориентира вбейте в навигаторе Ресторан «Берикони». "
+        "Если смотреть на вход ресторана, слева в десяти метрах будет дверь на ступеньках. "
+        "Позвоните, когда будете возле неё, я вас встречу."
+    )
+    INTERVIEW_CONTACT: str = "+7 905 530-11-91 Анна"
 
     @property
     def database_url(self) -> str:

@@ -24,6 +24,11 @@ CONSENT_TEXT = (
 )
 
 
+def _question_title(number: int) -> str:
+    total = 8 if settings.ASK_METRO else 7
+    return f"📝 <b>Вопрос {number} из {total}</b>"
+
+
 async def get_or_create_candidate(tg_id: int, username: str | None) -> Candidate:
     async with SessionLocal() as session:
         result = await session.execute(
@@ -68,7 +73,7 @@ async def consent_yes(callback: CallbackQuery, state: FSMContext):
 
     await callback.message.edit_text("✅ Спасибо! Начинаем анкету.")
     await callback.message.answer(
-        "📝 <b>Вопрос 1 из 8</b>\n\nВведите вашу фамилию и имя:",
+        f"{_question_title(1)}\n\nВведите вашу фамилию и имя:",
         parse_mode="HTML"
     )
     await state.set_state(QuestionnaireState.full_name)
@@ -82,7 +87,7 @@ async def q_full_name(message: Message, state: FSMContext):
         return
     await state.update_data(full_name=message.text.strip()[:256])
     await message.answer(
-        "📝 <b>Вопрос 2 из 8</b>\n\nВведите ваш номер телефона или нажмите кнопку ниже:",
+        f"{_question_title(2)}\n\nВведите ваш номер телефона или нажмите кнопку ниже:",
         parse_mode="HTML",
         reply_markup=PHONE_KB,
     )
@@ -108,7 +113,7 @@ async def q_phone_text(message: Message, state: FSMContext):
 
 async def _ask_age(message: Message, state: FSMContext):
     await message.answer(
-        "📝 <b>Вопрос 3 из 8</b>\n\nСколько вам лет?",
+        f"{_question_title(3)}\n\nСколько вам лет?",
         parse_mode="HTML",
         reply_markup=ReplyKeyboardRemove(),
     )
@@ -134,7 +139,7 @@ async def q_age(message: Message, state: FSMContext):
         return
     await state.update_data(age=age)
     await message.answer(
-        "📝 <b>Вопрос 4 из 8</b>\n\nЕсть ли у вас опыт в продажах?",
+        f"{_question_title(4)}\n\nЕсть ли у вас опыт в продажах?",
         parse_mode="HTML",
         reply_markup=SALES_EXP_KB,
     )
@@ -145,14 +150,14 @@ async def q_age(message: Message, state: FSMContext):
 @router.callback_query(QuestionnaireState.has_sales_exp, F.data == "sales_no")
 async def q_sales_no(callback: CallbackQuery, state: FSMContext):
     await state.update_data(has_sales_experience=False, sales_experience_details=None)
-    await callback.message.edit_text("📝 <b>Вопрос 4 из 8</b>\n\nОпыт в продажах: Нет", parse_mode="HTML")
+    await callback.message.edit_text(f"{_question_title(4)}\n\nОпыт в продажах: Нет", parse_mode="HTML")
     await _ask_last_job(callback.message, state)
 
 
 @router.callback_query(QuestionnaireState.has_sales_exp, F.data == "sales_yes")
 async def q_sales_yes(callback: CallbackQuery, state: FSMContext):
     await state.update_data(has_sales_experience=True)
-    await callback.message.edit_text("📝 <b>Вопрос 4 из 8</b>\n\nОпыт в продажах: Да", parse_mode="HTML")
+    await callback.message.edit_text(f"{_question_title(4)}\n\nОпыт в продажах: Да", parse_mode="HTML")
     await callback.message.answer("Расскажите кратко о вашем опыте в продажах:")
     await state.set_state(QuestionnaireState.sales_exp_details)
 
@@ -165,7 +170,7 @@ async def q_sales_details(message: Message, state: FSMContext):
 
 async def _ask_last_job(message: Message, state: FSMContext):
     await message.answer(
-        "📝 <b>Вопрос 5 из 8</b>\n\nГде вы работали последний раз? "
+        f"{_question_title(5)}\n\nГде вы работали последний раз? "
         "Кратко опишите должность и обязанности:",
         parse_mode="HTML",
     )
@@ -180,7 +185,7 @@ async def q_last_job(message: Message, state: FSMContext):
         return
     await state.update_data(last_job=message.text.strip()[:500])
     await message.answer(
-        "📝 <b>Вопрос 6 из 8</b>\n\nКакой график вам подходит?",
+        f"{_question_title(6)}\n\nКакой график вам подходит?",
         parse_mode="HTML",
         reply_markup=SCHEDULE_KB,
     )
@@ -204,11 +209,20 @@ async def q_schedule(callback: CallbackQuery, state: FSMContext):
     value = SCHEDULE_LABELS[callback.data]
     await state.update_data(schedule=value)
     await callback.message.edit_text(
-        f"📝 <b>Вопрос 6 из 8</b>\n\nГрафик: {SCHEDULE_DISPLAY[value]}",
+        f"{_question_title(6)}\n\nГрафик: {SCHEDULE_DISPLAY[value]}",
         parse_mode="HTML",
     )
+    if not settings.ASK_METRO:
+        await state.update_data(nearest_metro="—")
+        await callback.message.answer(
+            f"{_question_title(7)}\n\nПочему вы хотите работать именно в табачном магазине?",
+            parse_mode="HTML",
+        )
+        await state.set_state(QuestionnaireState.motivation)
+        return
+
     await callback.message.answer(
-        "📝 <b>Вопрос 7 из 8</b>\n\nКакое ближайшее метро к вашему дому?",
+        f"{_question_title(7)}\n\nКакое ближайшее метро к вашему дому?",
         parse_mode="HTML",
     )
     await state.set_state(QuestionnaireState.metro)
@@ -222,7 +236,7 @@ async def q_metro(message: Message, state: FSMContext):
         return
     await state.update_data(nearest_metro=message.text.strip()[:128])
     await message.answer(
-        "📝 <b>Вопрос 8 из 8</b>\n\nПочему вы хотите работать именно в табачном магазине?",
+        f"{_question_title(8)}\n\nПочему вы хотите работать именно в табачном магазине?",
         parse_mode="HTML",
     )
     await state.set_state(QuestionnaireState.motivation)
@@ -296,7 +310,10 @@ async def _notify_admin(bot, candidate_id: int, data: dict, tg_id: int, username
         f"💼 <b>Опыт в продажах:</b> {sales_info}\n"
         f"🏢 <b>Последнее место работы:</b> {data['last_job']}\n"
         f"🕐 <b>График:</b> {schedule_display}\n"
-        f"🚇 <b>Метро:</b> {data['nearest_metro']}\n"
+    )
+    if settings.ASK_METRO:
+        text += f"🚇 <b>Метро:</b> {data['nearest_metro']}\n"
+    text += (
         f"💬 <b>Мотивация:</b> {data['motivation']}\n\n"
         f"✈️ <b>Telegram:</b> {tg_link}"
     )
