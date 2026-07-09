@@ -20,6 +20,7 @@ async def ensure_schema():
         await conn.execute(
             text("ALTER TABLE slots ADD COLUMN IF NOT EXISTS day_before_reminder_sent BOOLEAN DEFAULT false")
         )
+        await conn.execute(text("UPDATE slots SET day_before_reminder_sent = false WHERE day_before_reminder_sent IS NULL"))
 
 
 async def main():
